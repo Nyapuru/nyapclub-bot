@@ -1,7 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
-const express = require('express'); // <-- костыль для Render
 
 const BOT_TOKEN = "8439879762:AAHlPSYKsR1HRUykVOV3mAEtVlP_Fa2oprI";
 const ADMIN_ID = 1916660294; // твой Telegram ID
@@ -119,7 +118,6 @@ bot.command('schedule', async (ctx) => {
     }
 });
 
-// ==================
 // Запуск бота
 bot.launch();
 console.log('Бот запущен. Чтобы остановить, нажмите Ctrl+C');
