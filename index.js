@@ -31,7 +31,7 @@ const db = admin.firestore();
 const app = express();
 const cors = require("cors");
 app.use(cors());
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.use(express.json());
 
 // Endpoint для кликов с фронтенда
