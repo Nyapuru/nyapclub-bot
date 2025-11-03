@@ -142,3 +142,10 @@ console.log('Бот запущен на Render. Чтобы остановить,
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// ==================
+// Костыль для Render — открытый порт
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
