@@ -44,7 +44,7 @@ app.post('/click', async (req, res) => {
 
     await userRef.set({
       name: userName,
-      photo_url: photoUrl || null,
+      photo_url: photoUrl ?? null,
       lastClick: new Date()
     }, { merge: true });
 
