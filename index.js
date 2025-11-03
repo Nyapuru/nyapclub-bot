@@ -75,7 +75,7 @@ bot.start(async (ctx) => {
   }, { merge: true });
 
   await ctx.replyWithPhoto(
-    'https://i.ibb.co/9mRgh8VL/penguin.png',
+    'https://i.ibb.co/DHkXr6Kz/1.png',
     {
       caption: `Привет, ${ctx.from.first_name || 'друг'}! 🐧\nТы классный! Я помогу тебе освоиться и не пропустить стримы с Няпом и Маней :3`,
       parse_mode: 'HTML',
@@ -132,7 +132,7 @@ bot.command('stream1', async (ctx) => {
 bot.command('stream2', async (ctx) => {
   await sendStreamNotification(
     "🎥 Маня запустила стрим и ждёт тебя!",
-    'https://i.ibb.co/3ycZ6CZj/555555555555555555.jpg',
+    'https://i.ibb.co/bgkdnYzW/2.png',
     'https://www.twitch.tv/manyaunderscore',
     ctx
   );
