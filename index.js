@@ -1,13 +1,23 @@
 const { Telegraf, Markup } = require('telegraf');
 const admin = require('firebase-admin');
 const express = require('express');
+const cors = require('cors');
 
-const BOT_TOKEN = process.env.BOT_TOKEN; // Установи на Render
-const ADMIN_ID = parseInt(process.env.ADMIN_ID); // Установи на Render
+// -------------------
+// Настройки окружения
+// -------------------
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const ADMIN_ID = parseInt(process.env.ADMIN_ID);
+const PORT = process.env.PORT || 10000;
 
+// -------------------
+// Инициализация бота
+// -------------------
 const bot = new Telegraf(BOT_TOKEN);
 
-// Инициализация Firebase через переменные окружения
+// -------------------
+// Firebase Admin SDK
+// -------------------
 admin.initializeApp({
   credential: admin.credential.cert({
     type: process.env.TYPE,
@@ -26,42 +36,57 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // -------------------
-// Express-сервер
+// Express сервер
 // -------------------
 const app = express();
-const cors = require("cors");
 app.use(cors());
-const PORT = process.env.PORT || 10000;
 app.use(express.json());
+
+// Проверка сервера
+app.get('/', (req, res) => {
+  res.send('🐧 Nyapuru Club bot & API running!');
+});
 
 // Endpoint для кликов с фронтенда
 app.post('/click', async (req, res) => {
   try {
     const { userId, userName, photoUrl } = req.body;
-    if (!userId) return res.status(400).json({ error: "Нет userId" });
+    console.log("📩 Получен клик:", req.body);
+
+    if (!userId) {
+      console.warn("⚠️ Нет userId в теле запроса");
+      return res.status(400).json({ error: "Нет userId" });
+    }
 
     const userRef = db.collection('users').doc(String(userId));
 
+    // Обновляем или создаем пользователя
     await userRef.set({
-      name: userName,
+      name: userName || "Без имени",
       photo_url: photoUrl ?? null,
       lastClick: new Date()
     }, { merge: true });
 
-    await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
+    // Инкремент кликов
+    await userRef.update({
+      clicks: admin.firestore.FieldValue.increment(1)
+    });
 
+    console.log(`✅ Клик засчитан для пользователя ${userId}`);
     res.json({ success: true });
   } catch (err) {
-    console.error("Ошибка при клике:", err);
+    console.error("❌ Ошибка при обработке клика:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/', (req, res) => res.send('Bot & API running!'));
-app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
+// Запуск Express
+app.listen(PORT, () => {
+  console.log(`🚀 Express listening on port ${PORT}`);
+});
 
 // -------------------
-// Телеграм-бот
+// Telegram-бот
 // -------------------
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -88,6 +113,9 @@ bot.start(async (ctx) => {
   );
 });
 
+// -------------------
+// Рассылка уведомлений
+// -------------------
 async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
   if (ctx.from.id !== ADMIN_ID) return ctx.reply('У тебя нет прав для этой команды!');
   try {
@@ -120,6 +148,7 @@ async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
   }
 }
 
+// Команды для уведомлений
 bot.command('stream1', async (ctx) => {
   await sendStreamNotification(
     "🎥 Няп запустил стрим и ждёт тебя!",
@@ -165,9 +194,11 @@ bot.command('schedule', async (ctx) => {
   }
 });
 
+// -------------------
 // Запуск бота
+// -------------------
 bot.launch();
-console.log('Бот запущен на Render. Чтобы остановить, нажмите Ctrl+C');
+console.log('🤖 Бот запущен на Render. Чтобы остановить, нажмите Ctrl+C');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
