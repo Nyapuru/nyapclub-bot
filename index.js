@@ -25,6 +25,14 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+// Костыль для Render — открытый порт
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
+
+// ==================
+
 // /start — приветствие с картинкой и кнопками
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -129,10 +137,7 @@ bot.command('schedule', async (ctx) => {
 });
 
 //клики
-// Разбор JSON тела
-app.use(express.json());
-
-// Обработка кликов
+// Endpoint для кликов с фронтенда
 app.post('/click', async (req, res) => {
   try {
     const { userId, userName, photoUrl } = req.body;
@@ -143,7 +148,7 @@ app.post('/click', async (req, res) => {
     await userRef.set({
       name: userName,
       photo_url: photoUrl || null,
-      lastClick: new Date(),
+      lastClick: new Date()
     }, { merge: true });
 
     await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
@@ -158,15 +163,10 @@ app.post('/click', async (req, res) => {
 app.get('/', (req, res) => res.send('Bot & API running!'));
 app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
 
+
 //
 
-// Костыль для Render — открытый порт
-const app = express();
-const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot is running!'));
-app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
 
-// ==================
 // Запуск бота
 bot.launch();
 console.log('Бот запущен на Render. Чтобы остановить, нажмите Ctrl+C');
