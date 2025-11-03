@@ -128,6 +128,38 @@ bot.command('schedule', async (ctx) => {
   }
 });
 
+//клики
+// Разбор JSON тела
+app.use(express.json());
+
+// Обработка кликов
+app.post('/click', async (req, res) => {
+  try {
+    const { userId, userName, photoUrl } = req.body;
+    if (!userId) return res.status(400).json({ error: "Нет userId" });
+
+    const userRef = db.collection('users').doc(String(userId));
+
+    await userRef.set({
+      name: userName,
+      photo_url: photoUrl || null,
+      lastClick: new Date(),
+    }, { merge: true });
+
+    await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ошибка при клике:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/', (req, res) => res.send('Bot & API running!'));
+app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
+
+//
+
 // Костыль для Render — открытый порт
 const app = express();
 const PORT = process.env.PORT || 3000;
