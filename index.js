@@ -25,14 +25,6 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// --- Костыль для Render: поднимаем HTTP-сервер на любом порту ---
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => res.send('Bot is running!'));
-app.listen(PORT, () => console.log(`HTTP-сервер запущен на порту ${PORT}`));
-// ---------------------------------------------------------------
-
 // /start — приветствие с картинкой и кнопками
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -136,16 +128,16 @@ bot.command('schedule', async (ctx) => {
   }
 });
 
+// Костыль для Render — открытый порт
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running!'));
+app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
+
+// ==================
 // Запуск бота
 bot.launch();
 console.log('Бот запущен на Render. Чтобы остановить, нажмите Ctrl+C');
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-
-// ==================
-// Костыль для Render — открытый порт
-const app = express();
-const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot is running!'));
-app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
