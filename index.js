@@ -25,15 +25,42 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// Костыль для Render — открытый порт
+// -------------------
+// Express-сервер
+// -------------------
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot is running!'));
+app.use(express.json());
+
+// Endpoint для кликов с фронтенда
+app.post('/click', async (req, res) => {
+  try {
+    const { userId, userName, photoUrl } = req.body;
+    if (!userId) return res.status(400).json({ error: "Нет userId" });
+
+    const userRef = db.collection('users').doc(String(userId));
+
+    await userRef.set({
+      name: userName,
+      photo_url: photoUrl || null,
+      lastClick: new Date()
+    }, { merge: true });
+
+    await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ошибка при клике:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/', (req, res) => res.send('Bot & API running!'));
 app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
 
-// ==================
-
-// /start — приветствие с картинкой и кнопками
+// -------------------
+// Телеграм-бот
+// -------------------
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const userRef = db.collection('users').doc(String(userId));
@@ -59,7 +86,6 @@ bot.start(async (ctx) => {
   );
 });
 
-// Функция рассылки уведомлений
 async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
   if (ctx.from.id !== ADMIN_ID) return ctx.reply('У тебя нет прав для этой команды!');
   try {
@@ -75,9 +101,7 @@ async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
           {
             caption: message,
             parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.url('📺 Смотреть', streamUrl)]
-            ])
+            ...Markup.inlineKeyboard([[Markup.button.url('📺 Смотреть', streamUrl)]])
           }
         );
         count++;
@@ -94,19 +118,22 @@ async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
   }
 }
 
-// Команды бота
 bot.command('stream1', async (ctx) => {
-  const message = "🎥 Няп запустил стрим и ждёт тебя!";
-  const photoUrl = 'https://i.ibb.co/WNwR2Jfp/41414144444422.jpg';
-  const streamUrl = 'https://twitch.tv/nyapuru';
-  await sendStreamNotification(message, photoUrl, streamUrl, ctx);
+  await sendStreamNotification(
+    "🎥 Няп запустил стрим и ждёт тебя!",
+    'https://i.ibb.co/WNwR2Jfp/41414144444422.jpg',
+    'https://twitch.tv/nyapuru',
+    ctx
+  );
 });
 
 bot.command('stream2', async (ctx) => {
-  const message = "🎥 Маня запустила стрим и ждёт тебя!";
-  const photoUrl = 'https://i.ibb.co/3ycZ6CZj/555555555555555555.jpg';
-  const streamUrl = 'https://www.twitch.tv/manyaunderscore';
-  await sendStreamNotification(message, photoUrl, streamUrl, ctx);
+  await sendStreamNotification(
+    "🎥 Маня запустила стрим и ждёт тебя!",
+    'https://i.ibb.co/3ycZ6CZj/555555555555555555.jpg',
+    'https://www.twitch.tv/manyaunderscore',
+    ctx
+  );
 });
 
 bot.command('schedule', async (ctx) => {
@@ -135,37 +162,6 @@ bot.command('schedule', async (ctx) => {
     ctx.reply('Произошла ошибка при рассылке. Смотри логи.');
   }
 });
-
-//клики
-// Endpoint для кликов с фронтенда
-app.post('/click', async (req, res) => {
-  try {
-    const { userId, userName, photoUrl } = req.body;
-    if (!userId) return res.status(400).json({ error: "Нет userId" });
-
-    const userRef = db.collection('users').doc(String(userId));
-
-    await userRef.set({
-      name: userName,
-      photo_url: photoUrl || null,
-      lastClick: new Date()
-    }, { merge: true });
-
-    await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Ошибка при клике:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/', (req, res) => res.send('Bot & API running!'));
-app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
-
-
-//
-
 
 // Запуск бота
 bot.launch();
