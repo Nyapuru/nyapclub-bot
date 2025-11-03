@@ -1,119 +1,173 @@
-<!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<title>Nyapuru Club</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-<style>
-html,body{
-  height:100%;
-  margin:0;
-  font-family:"Inter",sans-serif;
-  background:white;
-  color:#222;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  touch-action: manipulation;
-}
-*{-webkit-tap-highlight-color: transparent;}
-h1{
-  margin-bottom:30px;
-  font-size:1.6em;
-}
-#penguin{
-  width:160px;
-  height:160px;
-  cursor:pointer;
-  display:block;
-  transition: transform 0.1s ease;
-  user-select:none;
-}
-#penguin:active{
-  transform: scale(0.95);
-}
-</style>
-</head>
-<body>
-<h1 id="greet">Привет!</h1>
-<img id="penguin" src="https://img.cryptorank.io/coins/pudgy_penguins1734444110427.png" alt="Пингвин">
+const { Telegraf, Markup } = require('telegraf');
+const admin = require('firebase-admin');
+const express = require('express');
 
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyAsEXre9p0gcOHFDtjcMUN-meh3T4hU_xE",
-  authDomain: "nyapclub.firebaseapp.com",
-  projectId: "nyapclub",
-  storageBucket: "nyapclub.firebasestorage.app",
-  messagingSenderId: "53370013681",
-  appId: "1:53370013681:web:0f715a2ce01d69db65a650"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const FieldValue = firebase.firestore.FieldValue;
+const BOT_TOKEN = process.env.BOT_TOKEN; // Установи на Render
+const ADMIN_ID = parseInt(process.env.ADMIN_ID); // Установи на Render
 
-const tg = window.Telegram.WebApp;
+const bot = new Telegraf(BOT_TOKEN);
 
-// Если сайт открыт не через Telegram
-if (!tg.initDataUnsafe?.user) {
-  document.body.innerHTML = `
-    <h1>Авторизуйтесь через Telegram</h1>
-    <p>Сканируйте QR-код, чтобы открыть приложение:</p>
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://t.me/nyapclub_bot" alt="QR код">
-  `;
-} else {
-  // Запрос Fullscreen только на мобильных
-  if (/Mobi|Android/i.test(navigator.userAgent)) {
-    try { tg.requestFullscreen(); } catch(e) { console.log("Fullscreen error:", e); }
+// Инициализация Firebase через переменные окружения
+admin.initializeApp({
+  credential: admin.credential.cert({
+    type: process.env.TYPE,
+    project_id: process.env.PROJECT_ID,
+    private_key_id: process.env.PRIVATE_KEY_ID,
+    private_key: process.env.PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.CLIENT_EMAIL,
+    client_id: process.env.CLIENT_ID,
+    auth_uri: process.env.AUTH_URI,
+    token_uri: process.env.TOKEN_URI,
+    auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
+    client_x509_cert_url: process.env.client_x509_cert_url
+  })
+});
+
+const db = admin.firestore();
+
+// -------------------
+// Express-сервер
+// -------------------
+const app = express();
+const cors = require("cors");
+app.use(cors());
+const PORT = process.env.PORT || 3000;
+app.use(express.json());
+
+// Endpoint для кликов с фронтенда
+app.post('/click', async (req, res) => {
+  try {
+    const { userId, userName, photoUrl } = req.body;
+    if (!userId) return res.status(400).json({ error: "Нет userId" });
+
+    const userRef = db.collection('users').doc(String(userId));
+
+    await userRef.set({
+      name: userName,
+      photo_url: photoUrl || null,
+      lastClick: new Date()
+    }, { merge: true });
+
+    await userRef.update({ clicks: admin.firestore.FieldValue.increment(1) });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ошибка при клике:", err);
+    res.status(500).json({ error: err.message });
   }
+});
 
-  const user = tg.initDataUnsafe.user;
-  const greet = document.getElementById("greet");
-  const penguin = document.getElementById("penguin");
+app.get('/', (req, res) => res.send('Bot & API running!'));
+app.listen(PORT, () => console.log(`Express listening on port ${PORT}`));
 
-  greet.textContent = `Привет, ${user.first_name}!`;
+// -------------------
+// Телеграм-бот
+// -------------------
+bot.start(async (ctx) => {
+  const userId = ctx.from.id;
+  const userRef = db.collection('users').doc(String(userId));
 
-  let clicks = 0;
-  const userDoc = db.collection("users").doc(user.id.toString());
+  await userRef.set({
+    id: userId,
+    name: ctx.from.first_name || 'друг',
+    photo_url: ctx.from.photo_url || null,
+    subscribed: true
+  }, { merge: true });
 
-  userDoc.get().then(docSnap => {
-    if (!docSnap.exists) {
-      userDoc.set({
-        name: user.first_name,
-        clicks: 0,
-        photo_url: user.photo_url || "https://placekitten.com/32/32"
-      }).then(initClickHandler);
-    } else {
-      userDoc.set({
-        name: user.first_name,
-        photo_url: user.photo_url || "https://placekitten.com/32/32"
-      }, { merge: true }).then(initClickHandler);
+  await ctx.replyWithPhoto(
+    'https://i.ibb.co/9mRgh8VL/penguin.png',
+    {
+      caption: `Привет, ${ctx.from.first_name || 'друг'}! 🐧\nТы классный! Я помогу тебе освоиться и не пропустить стримы с Няпом и Маней :3`,
+      parse_mode: 'HTML',
+      ...Markup.inlineKeyboard([
+        [Markup.button.webApp('🐧 Разбудить Пингвина', 'https://nyapuru.github.io/testsite/')],
+        [Markup.button.url('🌸 Уютный канал', 'https://t.me/nyaplive')],
+        [Markup.button.url('💬 Ламповый чатик', 'https://t.me/nyapchat')]
+      ])
     }
-  });
+  );
+});
 
-  function initClickHandler() {
-    penguin.addEventListener("mousedown", animateClick);
-    penguin.addEventListener("touchstart", animateClick);
+async function sendStreamNotification(message, photoUrl, streamUrl, ctx) {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply('У тебя нет прав для этой команды!');
+  try {
+    const usersSnapshot = await db.collection('users').where('subscribed', '==', true).get();
+    let count = 0;
 
-    penguin.addEventListener("click", () => {
-      clicks++;
-      userDoc.update({ clicks: FieldValue.increment(1) })
-        .catch(err => console.log("Ошибка записи в Firestore:", err));
-
-      if (clicks >= 30) {
-        window.location.href = "profile.html";
+    for (const doc of usersSnapshot.docs) {
+      const userId = parseInt(doc.id);
+      try {
+        await ctx.telegram.sendPhoto(
+          userId,
+          photoUrl,
+          {
+            caption: message,
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([[Markup.button.url('📺 Смотреть', streamUrl)]])
+          }
+        );
+        count++;
+        await new Promise(res => setTimeout(res, 50));
+      } catch (e) {
+        console.log('Ошибка отправки пользователю', userId, e.message);
       }
-    });
-  }
+    }
 
-  function animateClick() {
-    penguin.style.transform = "scale(0.95)";
-    setTimeout(() => penguin.style.transform = "scale(1)", 100);
+    ctx.reply(`Уведомление отправлено ${count} пользователям`);
+  } catch (err) {
+    console.error('Ошибка при рассылке:', err.message);
+    ctx.reply('Произошла ошибка при рассылке. Смотри логи.');
   }
 }
-</script>
-</body>
-</html>
+
+bot.command('stream1', async (ctx) => {
+  await sendStreamNotification(
+    "🎥 Няп запустил стрим и ждёт тебя!",
+    'https://i.ibb.co/WNwR2Jfp/41414144444422.jpg',
+    'https://twitch.tv/nyapuru',
+    ctx
+  );
+});
+
+bot.command('stream2', async (ctx) => {
+  await sendStreamNotification(
+    "🎥 Маня запустила стрим и ждёт тебя!",
+    'https://i.ibb.co/3ycZ6CZj/555555555555555555.jpg',
+    'https://www.twitch.tv/manyaunderscore',
+    ctx
+  );
+});
+
+bot.command('schedule', async (ctx) => {
+  if (ctx.from.id !== ADMIN_ID) return ctx.reply('У тебя нет прав для этой команды!');
+  const message = "📃 Расписание стримов на эту неделю!";
+  const photoUrl = 'https://i.ibb.co/GvYV126f/rasss.jpg';
+
+  try {
+    const usersSnapshot = await db.collection('users').where('subscribed', '==', true).get();
+    let count = 0;
+
+    for (const doc of usersSnapshot.docs) {
+      const userId = parseInt(doc.id);
+      try {
+        await ctx.telegram.sendPhoto(userId, photoUrl, { caption: message });
+        count++;
+        await new Promise(res => setTimeout(res, 50));
+      } catch (e) {
+        console.log('Ошибка отправки пользователю', userId, e.message);
+      }
+    }
+
+    ctx.reply(`Расписание отправлено ${count} пользователям`);
+  } catch (err) {
+    console.error('Ошибка при рассылке:', err.message);
+    ctx.reply('Произошла ошибка при рассылке. Смотри логи.');
+  }
+});
+
+// Запуск бота
+bot.launch();
+console.log('Бот запущен на Render. Чтобы остановить, нажмите Ctrl+C');
+
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
